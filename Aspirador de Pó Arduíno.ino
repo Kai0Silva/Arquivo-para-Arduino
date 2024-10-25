@@ -1,66 +1,108 @@
-int trig = 3;
-int echo = 5;
-int duration;
-int dist;
+#include <IRremote.h>
 
+// Definições dos pinos
+const int motor1Pin1 = 5;  // Motor 1: pino 1
+const int motor1Pin2 = 6;  // Motor 1: pino 2
+const int motor2Pin1 = 9;  // Motor 2: pino 1
+const int motor2Pin2 = 10; // Motor 2: pino 2
+const int echoPin = 7;      // Pino do sensor ultrassônico: echo
+const int trigPin = 8;      // Pino do sensor ultrassônico: trig
 
-void setup()
-{
-  Serial.begin(9600);
-  pinMode(trig, OUTPUT);
-  pinMode(echo, INPUT);
-  pinMode(9, OUTPUT); // O pino 9 será usado para o buzzer
+IRrecv irrecv(2); // Pino do receptor IR
+decode_results results;
+
+// Define a velocidade dos motores (0 a 255)
+int motorSpeed = 255; // Velocidade máxima
+
+void setup() {
+    Serial.begin(9600);
+    
+    // Configuração dos pinos dos motores
+    pinMode(motor1Pin1, OUTPUT);
+    pinMode(motor1Pin2, OUTPUT);
+    pinMode(motor2Pin1, OUTPUT);
+    pinMode(motor2Pin2, OUTPUT);
+    
+    // Configuração dos pinos do sensor ultrassônico
+    pinMode(trigPin, OUTPUT);
+    pinMode(echoPin, INPUT);
+    
+    // Inicializa o receptor IR
+    irrecv.enableIRIn();
 }
 
-
-void loop()
-{
-  digitalWrite(trig, HIGH);
-  delay(10); // Pequeno atraso para evitar leituras incorretas
-  digitalWrite(trig, LOW);
-  duration = pulseIn(echo, HIGH);
-  dist = (duration / 2) / 29.1;
-
-
-  if (dist < 30)
-  {
-    Serial.println("on");
-    playMarioTune();
-  }
-  else
-  {
-    Serial.println("off");
-    noTone(9); // Para o som se a distância for maior que 300 cm
-  }
-
-
-  delay(1000); // Atraso para evitar leituras rápidas demais
-}
-
-
-void playMarioTune()
-{
-  // Notas e durações para a música do Mario
-  int melody[] = {
-      330, 330, 0, 330, 0, 262, 330, 0, 392, 0, 0,
-      262, 0, 196, 0, 164, 0, 220, 0, 247, 0, 233, 220, 0,
-      196, 330, 0, 392, 0, 440, 0, 349, 392, 0, 330, 0, 262, 294, 247, 0};
-
-
-  int noteDurations[] = {
-      100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
-      100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
-      100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
-
-
-  for (int thisNote = 0; thisNote < 39; thisNote++)
-  {
-    int noteDuration = noteDurations[thisNote];
-    if (melody[thisNote] != 0)
-    {
-      tone(9, melody[thisNote], noteDuration);
+void loop() {
+    if (irrecv.decode(&results)) {
+        switch(results.value) {
+            case 0xFFA25D: // Código do botão "cima"
+                moveForward();
+                break;
+            case 0xFF629D: // Código do botão "baixo"
+                moveBackward();
+                break;
+            case 0xFF22DD: // Código do botão "esquerda"
+                turnLeft();
+                break;
+            case 0xFFC23D: // Código do botão "direita"
+                turnRight();
+                break;
+            case 0xFFFFFFFF: // Código do botão "stop"
+                stopMovement();
+                break;
+            default:
+                break;
+        }
+        irrecv.resume(); // Recebe o próximo valor
     }
-    delay(noteDuration * 1.30); // Pausa entre as notas
-    noTone(9); // Para o som entre as notas
-  }
+    
+    // Lógica do sensor ultrassônico
+    long duration, distance;
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+    duration = pulseIn(echoPin, HIGH);
+    distance = (duration * 0.034) / 2; // Converte para cm
+
+    if (distance < 20) { // Se um obstáculo estiver a menos de 20 cm
+        stopMovement();
+        delay(500);
+        turnLeft(); // Gira para a esquerda quando encontra um obstáculo
+    }
+}
+
+void moveForward() {
+    analogWrite(motor1Pin1, motorSpeed);
+    analogWrite(motor1Pin2, LOW);
+    analogWrite(motor2Pin1, motorSpeed);
+    analogWrite(motor2Pin2, LOW);
+}
+
+void moveBackward() {
+    analogWrite(motor1Pin1, LOW);
+    analogWrite(motor1Pin2, motorSpeed);
+    analogWrite(motor2Pin1, LOW);
+    analogWrite(motor2Pin2, motorSpeed);
+}
+
+void turnLeft() {
+    analogWrite(motor1Pin1, LOW);
+    analogWrite(motor1Pin2, motorSpeed);
+    analogWrite(motor2Pin1, motorSpeed);
+    analogWrite(motor2Pin2, LOW);
+}
+
+void turnRight() {
+    analogWrite(motor1Pin1, motorSpeed);
+    analogWrite(motor1Pin2, LOW);
+    analogWrite(motor2Pin1, LOW);
+    analogWrite(motor2Pin2, motorSpeed);
+}
+
+void stopMovement() {
+    analogWrite(motor1Pin1, LOW);
+    analogWrite(motor1Pin2, LOW);
+    analogWrite(motor2Pin1, LOW);
+    analogWrite(motor2Pin2, LOW);
 }
